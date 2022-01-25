@@ -1,0 +1,104 @@
+---
+title: "ADA_Practical_1"
+author: "Zane Hassoun"
+date: "1/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tidyverse)
+HornsRev <- read_csv("C:/Users/zaneh/Downloads/HornsRev.csv")
+HornsRev$Impact = as.factor(HornsRev$Impact)
+HornsRev$AbundanceRate = HornsRev$Nhat/HornsRev$Area 
+```
+
+
+
+```{r}
+#Adding the initial plots
+par(mfrow=c(2,2))
+boxes = boxplot(Nhat/Area~Impact, data = HornsRev)
+x1 = hist(HornsRev$Nhat[which(HornsRev$Impact == 0)])
+x2 = hist(HornsRev$Nhat[which(HornsRev$Impact == 0)])
+```
+
+```{r}
+#Questions 2 and 3
+mean = mean(HornsRev$AbundanceRate[which(HornsRev$Impact == 0)])
+alpha = 0.2
+n = length(HornsRev$AbundanceRate[which(HornsRev$Impact == 0)])
+sd = sd(HornsRev$AbundanceRate[which(HornsRev$Impact == 0)])
+upper = mean + qt(alpha/2, df = n-1, lower.tail = FALSE)*(sd/sqrt(n))
+lower = mean - qt(alpha/2, df = n-1,lower.tail = FALSE)*(sd/sqrt(n))
+upper
+lower
+```
+
+```{r}
+#Question 4 and 5
+
+mean = mean(HornsRev$AbundanceRate[which(HornsRev$Impact == 0)])
+alpha = 0.2
+n = length(HornsRev$AbundanceRate[which(HornsRev$Impact == 0)])
+
+
+upper = mean + qnorm(1-alpha/2)*sqrt(mean/n)
+
+lower = mean - qnorm(1-alpha/2)*sqrt(mean/n)
+
+upper
+lower
+
+```
+
+```{r}
+#Questions 6 and 7 
+
+npost = nrow(filter(HornsRev, Impact==1))
+mm = mean(filter(HornsRev, Impact==1)$AbundanceRate)
+ll = mm - qnorm(1 - alpha/2) * sd(filter(HornsRev, Impact==1)$AbundanceRate)/sqrt(npost)
+uu = mm + qnorm(1 - alpha/2) * sd(filter(HornsRev, Impact==1)$AbundanceRate)/sqrt(npost)
+print(paste("lower", round(ll, 2)))
+print(paste("upper", round(uu, 2)))
+
+```
+
+
+```{r}
+# Question 8 and 9
+set.seed(145) # set this to reproduce results
+NBOOT <- 1000 # no. of bootstrap samples
+alpha <- 0.02 # alpha level of confidence
+# For pre-imact (Impact=0)
+dfPre <- subset(HornsRev, Impact==1)
+muHat <- sapply(seq(NBOOT),
+function(x) mean(sample(x=dfPre$Nhat/dfPre$Area,
+size=nrow(dfPre),
+replace=TRUE)))
+CI <- quantile(muHat, c(alpha/2, 1-(alpha/2)))
+
+CI
+```
+
+
+#### Question 10 
+Either 3 or 4 is false; I think 4 is true so 3. 
+
+#### Question 11
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
