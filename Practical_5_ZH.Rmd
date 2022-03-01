@@ -45,6 +45,7 @@ PRS_B = stats::update(PRS, .~. -s(Depth) + splines::bs(Depth, knots = 20))
 summary(PRS_B)
 stats::termplot(PRS_B, se=T)
 
+
 ```
 
 
@@ -94,7 +95,7 @@ for(phase in c(0,1)){
                        df$YPos[which(df$Impact == phase)],
                        NhatPredLink$fit[which(df$Impact == phase)],
                        nrow=25, ncol=60,
-                       zlim=range(NhatPredLink$fit),
+                       #zlim=range(NhatPredLink$fit),
                        main=paste(ifelse(phase == 0, "Pre Impact (Link Scale)", "Post Impact (Link Scale)")))
 }
 for(phase in c(0,1)){
@@ -103,7 +104,7 @@ for(phase in c(0,1)){
                        df$YPos[which(df$Impact == phase)],
                        NhatPredRes$fit[which(df$Impact == phase)],
                        nrow=25, ncol=60,
-                       zlim=range(NhatPredRes$fit),
+                       # zlim=range(NhatPredRes$fit),
                        main=paste(ifelse(phase == 0, "Pre Impact(Response Scale)", "Post Impact (Response Scale)")))
 }
 
@@ -158,16 +159,83 @@ for(phase in c(0,1)){
 mtext("Quilt Plots for GAM with Interaction of XPos and Impact", side = 3, line = -13, outer = TRUE)
 
 runs.test(residuals(PRS_Int, type = 'pearson'))
+residuals(PRS_Int, type = 'pearson')[1:100]
+acf(residuals(PRS_Int, type = 'pearson'))
+```
+
+```{r}
+
+
+par(mfrow=c(2,2))
+
+# Loop across all phases
+
+
+for(phase in c(0,1)){
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       fitted(PRS)[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                       #zlim=range(NhatPredLink$fit),
+                       main=paste(ifelse(phase == 0, "Pre Impact (Link Scale)", "Post Impact (Link Scale)")))
+}
+for(phase in c(0,1)){
+  iteration = df$Impact %in% phase
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       fitted(PRS)[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                       # zlim=range(NhatPredRes$fit),
+                       main=paste(ifelse(phase == 0, "Pre Impact(Response Scale)", "Post Impact (Response Scale)")))
+}
+
+
+
+par(mfrow=c(2,2))
+
+# Loop across all phases
+
+
+for(phase in c(0,1)){
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       fitted(PRS_Int)[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                       #zlim=range(NhatPredLink$fit),
+                       main=paste(ifelse(phase == 0, "Pre Impact (Link Scale)", "Post Impact (Link Scale)")))
+}
+for(phase in c(0,1)){
+  iteration = df$Impact %in% phase
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       fitted(PRS_Int)[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                       # zlim=range(NhatPredRes$fit),
+                       main=paste(ifelse(phase == 0, "Pre Impact(Response Scale)", "Post Impact (Response Scale)")))
+}
+
+
 
 ```
 
+```{r}
+q1 = "A"
+q2 = "E"
+q3 = "True"
+q4 = "True"
+q5 = "True"
+q6 = "C"
+q7 = "True"
+q8 = "True"
+q9 = "False"
+q10 = "B"
 
+answers = data.frame("Answer" = c(1:10),
+                     "Question" = c(q1,q2,q3,q4,q5,q6,q7,q8,q9,q10)
+                     )
 
-
-
-
-
-
+pander::pander(answers)
+```
 
 
 
