@@ -1,0 +1,168 @@
+---
+title: "ADA_Practical_2"
+author: "Zane Hassoun"
+date: "2/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(car)
+library(lawstat)
+library(readr)
+HornsRev <- read_csv("C:/Users/zaneh/Downloads/HornsRev.csv")
+HornsRev$Impact = as.factor(HornsRev$Impact)
+HornsRev$AbundanceRate = HornsRev$Nhat/HornsRev$Area 
+```
+
+#### Part I Fitting the Initial Model glmFit0D2 and glmFit0D3 with and without interaction
+
+```{r, echo = FALSE}
+glmFit0D2 = glm(Nhat ~ Impact + Depth + XPos + YPos, 
+                   data = HornsRev,
+                   family = quasipoisson(),
+                   offset = log(Area))
+
+glmFit0D3 = glm(Nhat ~ Impact + Depth + XPos + YPos + Impact:YPos + Impact:XPos,
+                   data = HornsRev,
+                   family = quasipoisson,
+                   offset = log(Area))
+glmFit0D2
+glmFit0D3
+```
+
+#### Part II Detecting Collinearity - Pairwise scatter plot using the pairs function
+
+```{r, Echo = FALSE}
+
+covariates = c("XPos", 
+                "YPos", 
+                "Depth")
+pairs(subset(HornsRev, 
+             select=covariates),
+      upper.panel=NULL, 
+      pch=19,
+      cex=0.3)
+
+# Now checking the Variance Inflation Factors of the Covariates within Each Model
+round(vif(glmFit0D2),2)
+round(vif(glmFit0D3),2)
+```
+
+#### Extract the model Matrix Itself and now evaluate the plot
+
+```{r, Echo = FALSE}
+xmatrix = model.matrix(glmFit0D3)
+# Plot the pairs matrix or coliniarity
+#head(xmatrix)
+covariates <- c("XPos", "YPos", "Depth", "Impact1",
+"Impact1:XPos", "Impact1:YPos")
+pairs(subset(xmatrix, select=covariates),
+upper.panel=NULL, pch=19, cex=0.3)
+```
+
+#### Part III Detecting Residual Autocorrelation
+
+```{r, echo = FALSE}
+#Generating 50 values from a normal distribution for the use of the model
+set.seed(101)
+testVals = rnorm(50)
+plot(sign(testVals),
+     type = "line")
+plot(sign(residuals(glmFit0D3, 
+                    type = 'pearson')[1:800]),
+     type = 'line', 
+     ylab = "Sign of the residuals")
+#Running a runs test to evaluate the statistics 
+
+runs.test(residuals(glmFit0D3, type = 'pearson'))
+```
+
+#### Part IV Diagnosing Non LInearities on the link scale
+
+```{r, echo = FALSE}
+par(mfrow=c(2,3))
+#Plotting the residual plots in relation to depth
+residualPlots(glmFit0D3,
+              type="pearson",
+              terms=~Depth,
+              quadratic=TRUE,
+              smooth=list(smoother=gamLine, col="#377eb8"),
+              fitted=FALSE,
+              col.quad="#e41a1c",
+              col="grey",
+              pch=19,
+              cex=0.3,
+              ylim=c(-20, 20))
+#Now test compare the residuals positive and negative of runs for first 100 with a random amount
+set.seed(101)
+# par(mfrow=c(1, 2))
+plot(sign(residuals(glmFit0D3, 
+                    type="pearson")[order(HornsRev$Depth)])[1:100],
+     type="l", 
+     main="100 Pearson residuals in depth order",
+     ylab="Pearson residuals")
+
+plot(sign(rnorm(100)), type="l", main="Random values")
+# The runs values look relatively different as there are longer runs for depth at negative values as opposed to positives
+#testing the runs test now to evaluate
+runs.test(residuals(glmFit0D3,
+                    type = "pearson")[order(HornsRev$Depth)])
+
+#Same exercise but for xpos term
+residualPlots(glmFit0D3,
+              type="pearson",
+              terms=~XPos,
+              quadratic=TRUE,
+              smooth=list(smoother=gamLine, col="#377eb8"),
+              fitted=FALSE,
+              col.quad="#e41a1c",
+              col="grey",
+              pch=19,
+              cex=0.3,
+              ylim=c(-20, 20))
+#Runs test on that data 
+runs.test(residuals(glmFit0D3,
+                    type = "pearson")[order(HornsRev$XPos)])
+
+#Same exercise for YPos
+residualPlots(glmFit0D3,
+              type="pearson",
+              terms=~YPos,
+              quadratic=TRUE,
+              smooth=list(smoother=gamLine, col="#377eb8"),
+              fitted=FALSE,
+              col.quad="#e41a1c",
+              col="grey",
+              pch=19,
+              cex=0.3,
+              ylim=c(-20, 20))
+#Runs test on that data 
+runs.test(residuals(glmFit0D3,
+                    type = "pearson")[order(HornsRev$YPos)])
+
+```
+
+```{r, include = FALSE}
+#1. A - False, B - False, C - False, D - *True*, E - False D
+#2. A - False, B - *True*, C - False, D - False, E - False B
+#3. A - False, B - False, C - False, D - False, E - *True* E
+#4. A - *True*, B - False, C - False, D - False, E - False A
+#5. A - False, B - False, C - False, D - *True*, E - False D
+```
+
+#### Part 5 Questions and Answers
+
+1.  **D**
+2.  **B**
+3.  **E**
+4.  **A**
+5.  **D**
+6.  **-66.63**
+7.  **True**
+8.  **-35.72**
+9.  **True**
+10. **-6.29**
+11. **True**
+12. **True**

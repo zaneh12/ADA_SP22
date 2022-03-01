@@ -16,31 +16,41 @@ HornsRev$AbundanceRate = HornsRev$Nhat/HornsRev$Area
 
 
 
-```{r}
+```{r, echo = FALSE}
 #Adding the initial plots
 par(mfrow=c(2,2))
+
+x1 = hist(filter(HornsRev, Impact == 0)$AbundanceRate, main = "pre")
+x2 = hist(filter(HornsRev, Impact == 1)$AbundanceRate, main = "post")
 boxes = boxplot(Nhat/Area~Impact, data = HornsRev)
-x1 = hist(HornsRev$Nhat[which(HornsRev$Impact == 0)])
-x2 = hist(HornsRev$Nhat[which(HornsRev$Impact == 0)])
+paste("pre impact abundance range",range(filter(HornsRev, Impact==0)$AbundanceRate)[2])
+paste("post impact abundance range",range(filter(HornsRev, Impact==1)$AbundanceRate)[2])
+
 ```
 
-```{r}
+
+```{r,echo = FALSE}
 #Questions 2 and 3
-mean = mean(HornsRev$AbundanceRate[which(HornsRev$Impact == 0)])
-alpha = 0.2
-n = length(HornsRev$AbundanceRate[which(HornsRev$Impact == 0)])
-sd = sd(HornsRev$AbundanceRate[which(HornsRev$Impact == 0)])
-upper = mean + qt(alpha/2, df = n-1, lower.tail = FALSE)*(sd/sqrt(n))
-lower = mean - qt(alpha/2, df = n-1,lower.tail = FALSE)*(sd/sqrt(n))
+#My Code
+m = mean(filter(HornsRev, Impact == 0)$AbundanceRate)
+n = nrow(filter(HornsRev, Impact == 0))
+alpha = 0.02
+sd = sd(filter(HornsRev, Impact == 0)$AbundanceRate)
+quantile = qt(1-alpha/2, df = n-1, lower.tail = FALSE)
+se = sd/sqrt(n)
+upper = m + quantile*se
+lower = m - quantile*se
 upper
 lower
+
+
 ```
 
-```{r}
+```{r, echo = FALSE}
 #Question 4 and 5
 
 mean = mean(HornsRev$AbundanceRate[which(HornsRev$Impact == 0)])
-alpha = 0.2
+alpha = 0.02
 n = length(HornsRev$AbundanceRate[which(HornsRev$Impact == 0)])
 
 
@@ -53,7 +63,7 @@ lower
 
 ```
 
-```{r}
+```{r,echo = FALSE}
 #Questions 6 and 7 
 
 npost = nrow(filter(HornsRev, Impact==1))
@@ -66,7 +76,7 @@ print(paste("upper", round(uu, 2)))
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 # Question 8 and 9
 set.seed(145) # set this to reproduce results
 NBOOT <- 1000 # no. of bootstrap samples
@@ -83,22 +93,100 @@ CI
 ```
 
 
-#### Question 10 
-Either 3 or 4 is false; I think 4 is true so 3. 
+```{r}
+#Building a quilt plot for surveying the data 
 
-#### Question 11
+library(fields)
+par(mfrow=c(1,2))
+quilt.plot(HornsRev$XPos[HornsRev$Impact == 0],
+           HornsRev$YPos[HornsRev$Impact == 0],
+           HornsRev$AbundanceRate[HornsRev$Impact == 0],
+           pch=25, 
+           main="Pre Impact", xlab="X co-ordinate", ylab="Y co-ordinate", 
+           nrow=20, ncol=20, asp=1)
+quilt.plot(HornsRev$XPos[HornsRev$Impact == 1],
+           HornsRev$YPos[HornsRev$Impact == 1],
+           HornsRev$AbundanceRate[HornsRev$Impact == 1],
+           pch=25, 
+           main="Post Impact", xlab="X co-ordinate", ylab="Y co-ordinate", 
+           nrow=20, ncol=20, asp=1)
+```
+#### Fitting Models
 
+```{r, echo = FALSE}
+#Fit Poisson-based GLMs with (quasi-poisson) and without (poisson) a dispersion parameter estimate
+#(each with an offset), produce a summary of the results and use the Anova function from the car package
+#(i.e. add library(car) to your script) to get a handle on the importance of each predictor. Remember to
+#use the right statistical test depending on whether the dispersion parameter ϕ is known or not. Consider
+#the following covariates for your models:
 
+#1. Impact only.
+#2. Impact, Depth, XPos and YPos.
+#3. Impact, Depth, XPos, YPos and interaction terms between Impact and each of XPos and YPos
 
+Model1_Quasi = glm(Nhat ~ Impact, 
+                   data = HornsRev,
+                   family = quasipoisson,
+                   offset = Area)
+Model1 = glm(Nhat ~ Impact,
+                   data = HornsRev,
+                   family = poisson,
+                   offset = Area)
+Model2_Quasi = glm(Nhat ~ Impact + Depth + XPos + YPos,
+                   data = HornsRev,
+                   family = quasipoisson,
+                   offset = Area)
+Model2 = glm(Nhat ~ Impact + Depth + XPos + YPos, 
+                   data = HornsRev,
+                   family = poisson,
+                   offset = Area)
 
+Model3_Quasi = glm(Nhat ~ Impact + Depth + XPos + YPos + Impact:YPos + Impact:XPos,
+                   data = HornsRev,
+                   family = quasipoisson,
+                   offset = Area)
+Model3 = glm(Nhat ~ Impact + Depth + XPos + YPos + Impact:YPos + Impact:XPos,
+                   data = HornsRev,
+                   family = poisson,
+                   offset = Area)
+library(car)
 
+summary(Model1)
+Anova(Model1)
+Anova(Model1_Quasi)
+summary(Model1_Quasi)
+summary(Model2)
+Anova(Model2)
+Anova(Model2_Quasi)
+summary(Model2_Quasi)
+summary(Model3)
+Anova(Model3)
+Anova(Model3_Quasi)
+summary(Model3_Quasi)
 
+```
 
+# Solutions
+```{r, echo=FALSE}
 
-
-
-
-
-
+Answers = data.frame(Solutions = c("A",
+                                 "47.42692",
+                                 "55.69008",
+                                 "51.42269",
+                                 "51.6943",
+                                 "66.86",
+                                 "83.93",
+                                 "67.39172",
+                                 "84.70234",
+                                 "C",
+                                 "C",
+                                 "A",
+                                 "A",
+                                 "A",
+                                 "TRUE"
+                                 
+                                 ))
+Answers
+```
 
 

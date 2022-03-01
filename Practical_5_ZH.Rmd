@@ -1,0 +1,184 @@
+---
+title: "ADA_P5"
+author: "Zane Hassoun"
+date: "3/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Libraries
+library(tidyverse) # ggplot(.)
+library(mgcv) # gam(.)
+library(splines) # bs(.) (B-splines)
+library(MuMIn) # dredge(.)
+library(fields) # quilt.plot(.)
+library(lawstat) # runs.test(.)
+#Read the Dataset in
+df = read.csv("C:/Users/zaneh/Downloads/HornsRev.csv")
+# Set Impact as factor
+df$Impact = as.factor(df$Impact)
+```
+
+#### Penalised Regression Splines using many covariates
+
+1. Fit a quasi-Poisson penalised spline based GAM (mgcv::gam(.)) as follows. Print out a summary of
+the model and inspect the results
+```{r}
+#Penalised Regression Spline
+
+PRS = mgcv::gam(Nhat ~ s(XPos) + s(YPos) + s(Depth) + Impact,
+data=df, family=quasipoisson, offset=log(Area))
+
+summary(PRS)
+
+par(mfrow=c(2,2))
+plot(PRS, shade = T, residuals = T, ylim=c(-10,10))
+
+```
+
+3. Visually compare the Depth relationship obtained using the PRS model to a model that uses a B-spline
+basis function instead with just one knot at 20m
+
+```{r}
+PRS_B = stats::update(PRS, .~. -s(Depth) + splines::bs(Depth, knots = 20))
+summary(PRS_B)
+stats::termplot(PRS_B, se=T)
+
+```
+
+
+4. Carry out model selection on the terms in the working GAM (i.e. the PRS model fitted in 1.) using the
+dredge function in the MuMIn library. Use QAIC to rank the different models. See lecture notes Section
+5.5 for a reminder of how to use the dredge function (the overdispersion parameter estimate can be
+found in PRS$scale).
+
+
+
+```{r}
+library(MuMIn)
+options(na.action="na.fail") # fail-safe
+PRS_Q = update(PRS, family = "poisson")
+head(dredge(PRS_Q,
+            rank = "QAIC",
+            chat = PRS$scale))
+
+```
+
+5. Download HornsRevPredictionData.csv from Moodle. This file contains a fine grid of XPos/YPos
+values and corresponding Depth measurements. Use the “best” model identified in 4. to predict over
+this fine grid and produce a spatial plot of all the results (pre/post-impact both on the link and response
+scale).
+
+```{r}
+predData = read.csv("C:/Users/zaneh/Downloads/HornsRevPredictionData.csv")
+
+# Predict on the link scale
+NhatPredLink = predict(PRS, newdata=predData,
+se=T, type="link")
+# Predict on the response scale
+NhatPredRes = predict(PRS, newdata=predData,
+se=T, type="response")
+
+```
+Predictions Quilt Plots
+
+```{r}
+par(mfrow=c(2,2))
+
+# Loop across all phases
+
+
+for(phase in c(0,1)){
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       NhatPredLink$fit[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                       zlim=range(NhatPredLink$fit),
+                       main=paste(ifelse(phase == 0, "Pre Impact (Link Scale)", "Post Impact (Link Scale)")))
+}
+for(phase in c(0,1)){
+  iteration = df$Impact %in% phase
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       NhatPredRes$fit[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                       zlim=range(NhatPredRes$fit),
+                       main=paste(ifelse(phase == 0, "Pre Impact(Response Scale)", "Post Impact (Response Scale)")))
+}
+
+mtext("Quilt Plots for GAM", side = 3, line = -13, outer = TRUE)
+
+
+```
+
+
+
+#### Fitting a GAM with multiple Covariates 
+
+```{r}
+PRS_Int = mgcv::gam(Nhat ~ s(XPos, by=Impact) + s(YPos) + s(Depth) + Impact,
+                    data=df, 
+                    family=quasipoisson, 
+                    offset=log(Area))
+summary(PRS_Int)
+
+NhatPredLink_2 = predict(PRS_Int, newdata=predData,
+se=T, type="link")
+# Predict on the response scale
+NhatPredRes_2 = predict(PRS_Int, newdata=predData,
+se=T, type="response")
+
+```
+
+```{r}
+par(mfrow=c(2,2))
+
+# Loop across all phases
+
+
+for(phase in c(0,1)){
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       NhatPredLink_2$fit[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                       zlim=range(NhatPredLink_2$fit),
+                       main=paste(ifelse(phase == 0, "Pre Impact (Link Scale)", "Post Impact (Link Scale)")))
+}
+for(phase in c(0,1)){
+  iteration = df$Impact %in% phase
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       NhatPredRes_2$fit[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                       zlim=range(NhatPredRes_2$fit),
+                       main=paste(ifelse(phase == 0, "Pre Impact(Response Scale)", "Post Impact (Response Scale)")))
+}
+
+mtext("Quilt Plots for GAM with Interaction of XPos and Impact", side = 3, line = -13, outer = TRUE)
+
+runs.test(residuals(PRS_Int, type = 'pearson'))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

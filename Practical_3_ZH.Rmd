@@ -1,0 +1,310 @@
+---
+title: "ADA_P3"
+author: "Zane Hassoun"
+date: "2/10/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+install.packages("glmnet")
+library(glmnet)
+HornsRev <- read_csv("C:/Users/zaneh/Downloads/HornsRev.csv")
+HornsRev$Impact = as.factor(HornsRev$Impact)
+```
+
+#### Comparing the Coefficients of GLM fit OD3 with those obtained from penalized regression
+
+```{r}
+glmFitOD3Scale = glm(Nhat ~ Impact*scale(XPos) + Impact*scale(YPos) + scale(Depth),
+                     offse = log(Area),
+                     family = quasipoisson,
+                     data = HornsRev)
+
+#Create design/model matrix
+
+xmatrix = model.matrix(glmFitOD3Scale)
+xmatrix = xmatrix[,2:ncol(xmatrix)]
+
+```
+
+#### Fitting a ridge regression model and use Cross Validation to pick the tuning parameter
+
+```{r}
+#Ridge Regression Model
+ridge = glmnet(xmatrix,
+               HornsRev$Nhat,
+               family = 'poisson',
+               offset = log(HornsRev$Area),
+               alpha = 0)
+#Cross Validate the model as well
+cvridge = cv.glmnet(xmatrix,
+               HornsRev$Nhat,
+               family = 'poisson',
+               offset = log(HornsRev$Area),
+               alpha = 0,
+               nfolds = 10)
+par(mfrow=c(1, 2))
+plot(ridge, xvar="lambda")
+abline(v=log(cvridge$lambda.min))
+plot(cvridge)
+abline(v=log(cvridge$lambda.min))
+abline(v=log(cvridge$lambda.1se), lty=2)
+```
+
+#### Examine which $\lambda$ values were trialed and which were chosen
+
+```{r}
+log(cvridge$lambda)
+log(cvridge$lambda.min)
+```
+
+#### Investigate the change in coefficients for the ridge regression compared to the initial scaled model
+
+```{r}
+#The fitted quasi poisson model coefficients
+coefGLM = as.data.frame(coef(glmFitOD3Scale))
+colnames(coefGLM) = "GLM"
+coefGLM$Covariate = row.names(coefGLM)
+
+#add the 95% confidence intervals
+
+confInt = as.data.frame(confint(glmFitOD3Scale,
+                                level = 0.95))
+colnames(confInt) = c("CI_Lower", "CI_Upper")
+confInt$Covariate = rownames(confInt)
+
+#Merge the datasets together
+coefGLM = dplyr::inner_join(coefGLM,
+                             confInt,
+                             by="Covariate")
+
+#Now for ridge regression
+coefRidge <- as.data.frame(as.matrix(coef(cvridge, s="lambda.min")))
+colnames(coefRidge) <- "Ridge"
+coefRidge$Covariate <- row.names(coefRidge)
+
+# Merge data frames
+mdlCoefs <- dplyr::inner_join(coefGLM, coefRidge, by="Covariate")
+
+
+print(mdlCoefs)
+#Plot the two differences
+
+ggplot(subset(mdlCoefs, !Covariate %in% "(Intercept)")) +
+  geom_point(aes(x=Covariate, y=GLM), col="#377eb8") +
+  geom_linerange(aes(x=Covariate, ymin=CI_Lower, ymax=CI_Upper),
+                 col="#377eb8") +
+  geom_point(aes(x=Covariate, y=Ridge), 
+             col="#e41a1c") +
+  ylab("Compare GLM to ridge coefficients") +
+  theme(axis.text.x=element_text(angle=90),
+        legend.position="none")
+
+#Testing the legitmacy of them falling within the confidence intervals
+
+ifelse(mdlCoefs$Ridge > mdlCoefs$CI_Lower &
+         mdlCoefs$Ridge < mdlCoefs$CI_Upper, TRUE, FALSE)
+```
+
+#### Repeat these steps again but with Lasso
+
+#### Fitting a Lasso model and use Cross Validation to pick the tuning parameter
+
+```{r}
+#Lasso Regression Model
+lasso = glmnet(xmatrix,
+               HornsRev$Nhat,
+               family = 'poisson',
+               offset = log(HornsRev$Area),
+               alpha = 1)
+#Cross Validate the model as well
+cvlasso = cv.glmnet(xmatrix,
+               HornsRev$Nhat,
+               family = 'poisson',
+               offset = log(HornsRev$Area),
+               alpha = 1,
+               nfolds = 10)
+par(mfrow=c(1, 2))
+plot(ridge, xvar="lambda")
+abline(v=log(cvlasso$lambda.min))
+plot(cvlasso)
+abline(v=log(cvlasso$lambda.min))
+abline(v=log(cvlasso$lambda.1se), lty=2)
+```
+
+#### Examine which $\lambda$ values were trialed and which were chosen
+
+```{r}
+log(cvlasso$lambda)
+log(cvlasso$lambda.min)
+```
+
+#### Investigate the change in coefficients for the ridge regression compared to the initial scaled model
+
+```{r}
+#The fitted quasi poisson model coefficients
+coefGLM = as.data.frame(coef(glmFitOD3Scale))
+colnames(coefGLM) = "GLM"
+coefGLM$Covariate = row.names(coefGLM)
+
+#add the 95% confidence intervals
+
+confInt = as.data.frame(confint(glmFitOD3Scale,
+                                level = 0.95))
+colnames(confInt) = c("CI_Lower", "CI_Upper")
+confInt$Covariate = rownames(confInt)
+
+#Merge the datasets together
+coefGLM = dplyr::inner_join(coefGLM,
+                             confInt,
+                             by="Covariate")
+
+#Now for lasso regression
+coef_lasso <- as.data.frame(as.matrix(coef(cvlasso, s="lambda.min")))
+colnames(coef_lasso) <- "Lasso"
+coef_lasso$Covariate <- row.names(coef_lasso)
+
+# Merge data frames
+lasso_coefs <- dplyr::inner_join(coefGLM, coef_lasso, by="Covariate")
+
+
+print(lasso_coefs)
+#Plot the two differences
+
+ggplot(subset(lasso_coefs, !Covariate %in% "(Intercept)")) +
+  geom_point(aes(x=Covariate, y=GLM), col="#377eb8") +
+  geom_linerange(aes(x=Covariate, ymin=CI_Lower, ymax=CI_Upper),
+                 col="#377eb8") +
+  geom_point(aes(x=Covariate, y=Lasso), 
+             col="#e41a1c") +
+  ylab("Compare GLM to lasso coefficients") +
+  theme(axis.text.x=element_text(angle=90),
+        legend.position="none")
+
+#Testing the legitmacy of them falling within the confidence intervals
+
+ifelse(lasso_coefs$Lasso > lasso_coefs$CI_Lower &
+         lasso_coefs$Lasso < lasso_coefs$CI_Upper, TRUE, FALSE)
+```
+
+#### Repeat these steps again but with Elastic Net
+
+#### Fitting a Elastic Net model and use Cross Validation to pick the tuning parameter
+
+```{r}
+#Lasso Regression Model
+elastic = glmnet(xmatrix,
+               HornsRev$Nhat,
+               family = 'poisson',
+               offset = log(HornsRev$Area),
+               alpha = 0.6)
+#Cross Validate the model as well
+cvelastic = cv.glmnet(xmatrix,
+               HornsRev$Nhat,
+               family = 'poisson',
+               offset = log(HornsRev$Area),
+               alpha = 0.6,
+               nfolds = 10)
+par(mfrow=c(1, 2))
+plot(ridge, xvar="lambda")
+abline(v=log(cvelastic$lambda.min))
+plot(cvelastic)
+abline(v=log(cvelastic$lambda.min))
+abline(v=log(cvelastic$lambda.1se), lty=2)
+```
+
+#### Examine which $\lambda$ values were trialed and which were chosen
+
+```{r}
+log(cvelastic$lambda)
+log(cvelastic$lambda.min)
+```
+
+#### Investigate the change in coefficients for the ridge regression compared to the initial scaled model
+
+```{r}
+#The fitted quasi poisson model coefficients
+coefGLM = as.data.frame(coef(glmFitOD3Scale))
+colnames(coefGLM) = "GLM"
+coefGLM$Covariate = row.names(coefGLM)
+
+#add the 95% confidence intervals
+
+confInt = as.data.frame(confint(glmFitOD3Scale,
+                                level = 0.95))
+colnames(confInt) = c("CI_Lower", "CI_Upper")
+confInt$Covariate = rownames(confInt)
+
+#Merge the datasets together
+coefGLM = dplyr::inner_join(coefGLM,
+                             confInt,
+                             by="Covariate")
+
+#Now for lasso regression
+coef_elastic <- as.data.frame(as.matrix(coef(cvelastic, s="lambda.min")))
+colnames(coef_elastic) <- "Elastic"
+coef_elastic$Covariate <- row.names(coef_elastic)
+
+# Merge data frames
+elastic_coefs <- dplyr::inner_join(coefGLM, coef_elastic, by="Covariate")
+
+
+print(lasso_coefs)
+#Plot the two differences
+
+ggplot(subset(elastic_coefs, !Covariate %in% "(Intercept)")) +
+  geom_point(aes(x=Covariate, y=GLM), col="#377eb8") +
+  geom_linerange(aes(x=Covariate, ymin=CI_Lower, ymax=CI_Upper),
+                 col="#377eb8") +
+  geom_point(aes(x=Covariate, y=Elastic), 
+             col="#e41a1c") +
+  ylab("Compare GLM to Elastic coefficients") +
+  theme(axis.text.x=element_text(angle=90),
+        legend.position="none")
+
+#Testing the legitmacy of them falling within the confidence intervals
+
+ifelse(elastic_coefs$Elastic > elastic_coefs$CI_Lower &
+         elastic_coefs$Elastic < elastic_coefs$CI_Upper, TRUE, FALSE)
+```
+
+#Now Compare All of the results
+
+```{r}
+combined_outcomes = data.frame(elastic_coefs,
+           "Lasso" = lasso_coefs$Lasso,
+           "Ridge" = mdlCoefs$Ridge)
+
+ggplot(combined_outcomes) +
+  geom_point(aes(x=Covariate, y=GLM), col="#377eb8") +
+  geom_linerange(aes(x=Covariate, ymin=CI_Lower, ymax=CI_Upper),
+                 col="#377eb8") +
+  geom_point(aes(x=Covariate, y=Ridge), col="#e41a1c") +
+  geom_point(aes(x=Covariate, y=Lasso), col="#4daf4a") +
+  geom_point(aes(x=Covariate, y=Elastic), col="#984ea3") +
+  ylab("Comparing regression coefficients") +
+  theme(axis.text.x=element_text(angle=90),
+        legend.position="none")
+
+```
+
+### Solutions
+
+```{r}
+solutions = data.frame("Question" = c(1:12),
+                       "Answer" = c("False",
+                                    "1.278",
+                                    "E",
+                                    "B",
+                                    "True",
+                                    "True",
+                                    "A",
+                                    "-2.374",
+                                    "True",
+                                    "True",
+                                    "-1.956",
+                                    "Elastic Net"))
+solutions
+```
