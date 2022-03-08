@@ -1,0 +1,269 @@
+---
+title: "ADA_P6"
+author: "Zane Hassoun"
+date: "3/8/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(mgcv)
+library(fields)
+df = read.csv("C:/Users/zaneh/Downloads/HornsRev.csv")
+pred_data = read.csv("C:/Users/zaneh/Downloads/HornsRevPredictionData.csv")
+df$Impact = as.factor(df$Impact)
+```
+
+```{r}
+colnames(df)
+```
+## Fitting Two Dimensional Smoothers
+
+1. Produce pre/post-impact spatial plots (using fields::quilt.plot(.)) of the observed data.
+
+```{r, fig.width=8, fig.height=4}
+#Fitting the Quilt Plots
+
+par(mfrow=c(1,2))
+
+# Loop across all phases
+
+
+for(phase in c(0,1)){
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       df$Nhat[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                       #zlim=range(NhatPredLink$fit),
+                       main=paste(ifelse(phase == 0, "Pre Impact", "Post Impact")))
+}
+```
+
+2. Fit a quasi-Poisson penalised spline based GAM (mgcv::gam(.); use the default options) with a two
+dimensional smoother for the spatial coordinates and a one dimensional smoother for Depth, whilst
+including Impact (not as an interaction term for now). Print out a summary of the resultant model,
+which will be referred to as PRS_2D.
+
+```{r}
+#Fitting a Quasi-Poisson with 2D Smoother for X and Y and 1D for depth and nothing for impact
+
+PRS_2D = mgcv::gam(Nhat ~ s(XPos, YPos) + s(Depth) + Impact,
+                   family = quasipoisson,
+                   offset = log(Area),
+                   data = df)
+summary(PRS_2D)
+```
+3. View the partial plots for PRS_2D.
+
+```{r}
+#Viewing the Partial Plots
+
+plot(PRS_2D, shade = T)
+
+```
+
+4. Use HornsRevPredictionData.csv to make pre/post-impact predictions on this fine grid using PRS_2D.
+Produce a spatial plot of the results (both on the link and response scale; set the same 𝑧-scale range
+(zlim) for pre and post-impact).
+
+```{r}
+pred_link = predict(PRS_2D,
+                    newdata = pred_data,
+                    type = 'link')
+pred_probs = predict(PRS_2D,
+                    newdata = pred_data,
+                    type = 'probs')
+
+
+
+plot.new()
+# Loop across all phases
+
+
+
+for(phase in c(0,1)){
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       pred_link[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                     zlim = range(pred_link),
+                       main=paste(ifelse(phase == 0, "Pre Impact (Link Scale)", "Post Impact (Link Scale)")))
+}
+for(phase in c(0,1)){
+  iteration = df$Impact %in% phase
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       pred_probs[which(df$Impact == phase)],
+                       nrow=25, ncol=60,zlim = range(pred_probs),
+                       main=paste(ifelse(phase == 0, "Pre Impact(Response Scale)", "Post Impact (Response Scale)")))
+}
+
+
+```
+## Fitting two dimensional smoothers with an interaction term
+
+5. Fit a similar model to PRS_2D, but now add Impact as an interaction term in the two dimensional
+spatial smoother (leave everything else the same). Print out a summary of the resultant model, which
+will be referred to as PRS_2DInt
+```{r}
+#Fitting a Quasi-Poisson with 2D Smoother for X and Y and 1D for depth and nothing for impact
+
+PRS_2DInt = mgcv::gam(Nhat ~ s(XPos, YPos, by = Impact) + s(Depth) + Impact,
+                   family = quasipoisson,
+                   offset = log(Area),
+                   data = df)
+summary(PRS_2DInt)
+```
+6. View the partial plots for PRS_2DInt.
+
+```{r}
+#Viewing the Partial Plots
+
+plot(PRS_2DInt, shade = T)
+
+```
+
+7. Use HornsRevPredictionData.csv to make pre/post-impact predictions on this fine grid using PRS_2D.
+Produce a spatial plot of the results (both on the link and response scale; set the same 𝑧-scale range
+(zlim) for pre and post-impact).
+
+```{r}
+pred_linkINT = predict(PRS_2DInt,
+                    newdata = pred_data,
+                    type = 'link')
+pred_probsINT = predict(PRS_2DInt,
+                    newdata = pred_data,
+                    type = 'probs')
+
+
+
+plot.new()
+# Loop across all phases
+
+
+
+for(phase in c(0,1)){
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       pred_linkINT[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                     zlim = range(pred_linkINT),
+                       main=paste(ifelse(phase == 0, "Pre Impact (Link Scale)", "Post Impact (Link Scale)")))
+}
+for(phase in c(0,1)){
+  iteration = df$Impact %in% phase
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       pred_probsINT[which(df$Impact == phase)],
+                       nrow=25, ncol=60,zlim = range(pred_probsINT),
+                       main=paste(ifelse(phase == 0, "Pre Impact(Response Scale)", "Post Impact (Response Scale)")))
+}
+
+```
+
+8. Plot the locations of the observation points and the fine prediction grid (HornsRevPredictionData.csv).
+
+```{r}
+library(MRSea)
+knotGrid = MRSea::getKnotgrid(coordData = cbind(df$XPos,df$YPos),
+                              numKnots = 300,
+                              plot = FALSE)
+
+plot(df$XPos, df$YPos, col="grey", pch=19, cex=0.2)
+points(knotGrid[, 1], knotGrid[, 2], pch=17, col="#e41a1c")
+```
+9. Try increasing (set k=15) and decreasing (set k=40) the limit on the degrees of freedom for the two
+dimensional spatial smoother (leave everything else the same; keep the interaction term). Print out a
+summary of the resultant models.
+
+
+```{r}
+PRS_2DInt_knots15 = mgcv::gam(Nhat ~ s(XPos, YPos, by = Impact, k=15) + s(Depth) + Impact,
+                   family = quasipoisson,
+                   offset = log(Area),
+                   data = df)
+summary(PRS_2DInt_knots15)
+
+PRS_2DInt_knots40 = mgcv::gam(Nhat ~ s(XPos, YPos, by = Impact, k=40) + s(Depth) + Impact,
+                   family = quasipoisson,
+                   offset = log(Area),
+                   data = df)
+summary(PRS_2DInt_knots40)
+```
+10. a) for k = 15
+
+```{r}
+pred_link15 = predict(PRS_2DInt_knots15,
+                    newdata = pred_data,
+                    type = 'link')
+pred_probs15 = predict(PRS_2DInt_knots15,
+                    newdata = pred_data,
+                    type = 'probs')
+
+
+
+plot.new()
+# Loop across all phases
+
+
+
+for(phase in c(0,1)){
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       pred_link15[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                     zlim = range(pred_link15),
+                       main=paste(ifelse(phase == 0, "Pre Impact (Link Scale)", "Post Impact (Link Scale)")))
+}
+for(phase in c(0,1)){
+  iteration = df$Impact %in% phase
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       pred_probs15[which(df$Impact == phase)],
+                       nrow=25, ncol=60,zlim = range(pred_probs15),
+                       main=paste(ifelse(phase == 0, "Pre Impact(Response Scale)", "Post Impact (Response Scale)")))
+}
+
+```
+
+10. b) for K = 40
+
+```{r}
+pred_link40 = predict(PRS_2DInt_knots40,
+                    newdata = pred_data,
+                    type = 'link')
+pred_probs40 = predict(PRS_2DInt_knots40,
+                    newdata = pred_data,
+                    type = 'probs')
+
+
+
+plot.new()
+# Loop across all phases
+
+
+
+for(phase in c(0,1)){
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       pred_link40[which(df$Impact == phase)],
+                       nrow=25, ncol=60,
+                     zlim = range(pred_link40),
+                       main=paste(ifelse(phase == 0, "Pre Impact (Link Scale)", "Post Impact (Link Scale)")))
+}
+for(phase in c(0,1)){
+  iteration = df$Impact %in% phase
+  fields::quilt.plot(df$XPos[which(df$Impact == phase)], 
+                       df$YPos[which(df$Impact == phase)],
+                       pred_probs40[which(df$Impact == phase)],
+                       nrow=25, ncol=60,zlim = range(pred_probs40),
+                       main=paste(ifelse(phase == 0, "Pre Impact(Response Scale)", "Post Impact (Response Scale)")))
+}
+
+```
+
+
+
+
+
+
